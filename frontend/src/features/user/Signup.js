@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import axios from 'axios'
+import authService from '../../services/auth'
 import ErrorMessage from '../shared/components/ErrorMessage'
 
 export default function Signup() {
@@ -11,15 +11,19 @@ export default function Signup() {
 	const handleSignUp = async e => {
 		e.preventDefault()
 		try {
-			setErrorMessage(null)
-			await axios.post(`http://localhost:3000/auth/signup`, {
-				username,
-				password,
-			})
+			await authService.register({ username, password })
 		} catch (error) {
 			setErrorMessage(error.response.data.message)
 		}
 	}
+
+	useEffect(() => {
+		return () => {
+			setUsername(null)
+			setPassword(null)
+			setErrorMessage(null)
+		}
+	}, [])
 
 	return (
 		<form

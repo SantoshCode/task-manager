@@ -1,29 +1,97 @@
-import axios from 'axios'
-import React, { useContext, useState } from 'react'
+import React, { useEffect, useReducer } from 'react'
 import { Link } from 'react-router-dom'
+import authService from '../../services/auth'
+import localStorageHelper from '../../utils/localStorageHelper'
 import ErrorMessage from '../shared/components/ErrorMessage'
-import { AuthContext } from '../shared/context/AuthContext'
 
-export default function Login() {
-	const auth = useContext(AuthContext)
-	const [username, setUsername] = useState('')
-	const [password, setPassword] = useState('')
-	const [errorMessage, setErrorMessage] = useState('')
+const actions = {
+	INPUT_CHANGE: 'INPUT_CHANGE',
+	SET_LOADING_FALSE: 'SET_LOADING_FALSE',
+	SET_LOADING_TRUE: 'SET_LOADING_TRUE',
+	SET_ERROR_MESSAGE: 'SET_ERROR_MESSAGE',
+	CLEAN_ERROR_MESSAGE: 'CLEAN_ERROR_MESSAGE',
+	CLEAN_STATE: 'CLEAN_STATE',
+}
+const types = {
+	USERNAME: 'username',
+	PASSWORD: 'password',
+}
+const reducer = (state, action) => {
+	switch (action.type) {
+		case actions.INPUT_CHANGE:
+			return {
+				...state,
+				[action.payload.key]: action.payload.value,
+			}
+		case actions.SET_LOADING_FALSE:
+			return {
+				...state,
+				isLoading: false,
+			}
+		case actions.SET_LOADING_TRUE:
+			return {
+				...state,
+				isLoading: true,
+			}
+		case actions.SET_ERROR_MESSAGE:
+			return {
+				...state,
+				errorMessage: action.payload.value,
+			}
+		case actions.CLEAN_STATE:
+			return {}
+		default:
+			return state
+	}
+}
+
+export default function Login({ setToken }) {
+	const [state, dispatch] = useReducer(reducer, {
+		username: '',
+		password: '',
+		isLoading: false,
+		errorMessage: '',
+	})
 
 	const handleSignIn = async e => {
 		e.preventDefault()
 		try {
-			setErrorMessage(null)
-			const res = await axios.post(`http://localhost:3000/auth/signin`, {
-				username,
-				password,
+			dispatch({ type: actions.SET_LOADING_TRUE })
+			const responseData = await authService.login({
+				username: state.username,
+				password: state.password,
 			})
-			const { userId, accessToken } = res.data
-			auth.login(userId, accessToken)
+			const { userId, accessToken } = responseData
+			setToken(accessToken)
+			localStorageHelper.storeUserDetailsInLocalStorage({
+				userId,
+				accessToken,
+			})
+			dispatch({ type: actions.SET_LOADING_FALSE })
+			dispatch({ type: actions.CLEAN_ERROR_MESSAGE })
 		} catch (error) {
-			setErrorMessage(error.response.data.message)
+			dispatch({ type: actions.SET_LOADING_FALSE })
+			dispatch({
+				type: actions.SET_ERROR_MESSAGE,
+				payload: { value: error.response.data.message },
+			})
 		}
 	}
+
+	useEffect(() => {
+		return () => {
+			dispatch({ type: actions.CLEAN_STATE })
+		}
+	}, [])
+
+	const handleChange = (actionType, inputType, value) => {
+		dispatch({
+			type: actionType,
+			payload: { key: inputType, value },
+		})
+	}
+
+	if (state.isLoading) return <h1>Loading...</h1>
 
 	return (
 		<form
@@ -37,22 +105,36 @@ export default function Login() {
 				fontSize: '1.8em',
 			}}
 		>
-			{errorMessage && <ErrorMessage message={errorMessage} />}
+			{state.errorMessage && (
+				<ErrorMessage message={state.errorMessage} />
+			)}
 			<label>Username</label>
 			<input
 				style={{ padding: '1rem', fontSize: '1em' }}
 				type="text"
 				placeholder="username"
-				value={username}
-				onChange={e => setUsername(e.target.value)}
+				value={state.username}
+				onChange={e =>
+					handleChange(
+						actions.INPUT_CHANGE,
+						types.USERNAME,
+						e.target.value
+					)
+				}
 			/>
 			<label>Password</label>
 			<input
 				style={{ padding: '1rem', fontSize: '1em' }}
 				type="password"
 				placeholder="password"
-				value={password}
-				onChange={e => setPassword(e.target.value)}
+				value={state.password}
+				onChange={e =>
+					handleChange(
+						actions.INPUT_CHANGE,
+						types.PASSWORD,
+						e.target.value
+					)
+				}
 			/>
 			<button
 				type="submit"

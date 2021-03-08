@@ -25,7 +25,9 @@ export class AuthService {
       authCredentialsDto,
     );
     const payload: JwtPayload = { userId: `${userId}` };
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload,{
+      expiresIn: 3600
+    });
 
     this.logger.debug(
       `Generating JWT Token with payload ${JSON.stringify(payload)}`,

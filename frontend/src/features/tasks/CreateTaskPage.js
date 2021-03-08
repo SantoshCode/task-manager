@@ -1,12 +1,9 @@
-import axios from 'axios'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ErrorMessage from '../shared/components/ErrorMessage'
-import useAuth from '../shared/hooks/useAuth'
+import taskService from '../../services/tasks'
 
 export default function CreateTaskPage() {
-	const auth = useAuth()
-	const { token } = auth
 	const [title, setTitle] = useState('')
 	const [description, setDescription] = useState('')
 	const [status, setStatus] = useState('OPEN')
@@ -15,17 +12,20 @@ export default function CreateTaskPage() {
 	const handleTaskSubmit = async e => {
 		e.preventDefault()
 		try {
-			setErrorMessage(null)
-			await axios.post(
-				`http://localhost:3000/tasks`,
-				{ title, description, status },
-				{ headers: { Authorization: `Bearer ${token}` } }
-			)
+			await taskService.createTask({ title, description, status })
 		} catch (error) {
+			console.log(error)
 			setErrorMessage(error.response.data.message)
 		}
 	}
-
+	useEffect(() => {
+		return () => {
+			setTitle(null)
+			setDescription(null)
+			setStatus(null)
+			setErrorMessage(null)
+		}
+	}, [])
 	return (
 		<>
 			<button>

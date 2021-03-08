@@ -1,41 +1,56 @@
-import axios from 'axios'
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useHistory } from 'react-router-dom'
+import taskService from '../../services/tasks'
+import authService from '../../services/auth'
 import ErrorMessage from '../shared/components/ErrorMessage'
-import { AuthContext } from '../shared/context/AuthContext'
 
-export default function TasksPage() {
-	const auth = useContext(AuthContext)
-	const { token, logout } = auth
+export default function TasksPage({ setToken }) {
 	const [tasks, setTasks] = useState([])
 	const [errorMessage, setErrorMessage] = useState('')
-	const [loading, setLoading] = useState(true)
+	const [isLoading, setIsLoading] = useState(false)
 	const history = useHistory()
 
 	useEffect(() => {
-		axios
-			.get('http://localhost:3000/tasks', {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			})
-			.then(res => {
-				const tasks = res.data
-				setTasks(tasks)
-			})
-			.catch(e => {
-				setErrorMessage(e.response.data.message)
-			})
-		setLoading(false)
-	}, [token])
+		let unmounted = false
+		const fetchTasksFun = async () => {
+			try {
+				if (!unmounted) {
+					setIsLoading(true)
+					const responseData = await taskService.fetchTasks()
+					setTasks(responseData)
+					setIsLoading(false)
+				}
+			} catch (err) {
+				if (!unmounted) {
+					setIsLoading(false)
+					setErrorMessage(err.response.data.message)
+				}
+			}
+		}
+		fetchTasksFun()
 
-	if (loading) return <h1>Loading...</h1>
+		return () => {
+			unmounted = true
+			setTasks(null)
+			setErrorMessage(null)
+			setIsLoading(null)
+		}
+	}, [])
+
+	if (isLoading) return <h1>Loading...</h1>
 
 	return (
 		<>
 			{errorMessage && <ErrorMessage message={errorMessage} />}
 			<h1>Welcome </h1>
-			<button onClick={logout}>Sign Out</button>
+			<button
+				onClick={() => {
+					authService.logout()
+					setToken(null)
+				}}
+			>
+				Sign Out
+			</button>
 			<button
 				style={{ margin: '1em' }}
 				onClick={() => {

@@ -1,49 +1,64 @@
-import axios from 'axios'
-import { useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import ErrorMessage from '../shared/components/ErrorMessage'
-import { AuthContext } from '../shared/context/AuthContext'
+import taskService from '../../services/tasks'
 
 export default function UpdateTaskPage() {
-	const auth = useContext(AuthContext)
-	const { token } = auth
 	const { taskId } = useParams()
 
 	const [title, setTitle] = useState('')
 	const [description, setDescription] = useState('')
-	const [status, setStatus] = useState()
-	const [errorMessage, setErrorMessage] = useState()
+	const [status, setStatus] = useState('')
+	const [updated, setUpdated] = useState(false)
+	const [errorMessage, setErrorMessage] = useState('')
+
 	useEffect(() => {
-		axios
-			.get(`http://localhost:3000/tasks/${taskId}`, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			})
-			.then(res => {
-				const { title, description, status } = res.data
-				setTitle(title)
-				setDescription(description)
-				setStatus(status)
-			})
-			.catch(e => {
-				setErrorMessage(e.response.data.message)
-			})
-	}, [taskId, token])
+		let unmounted = false
+		const fetchTask = async () => {
+			try {
+				if (!unmounted) {
+					const responseData = await taskService.fetchTaskById(taskId)
+					const { title, description, status } = responseData
+					setTitle(title)
+					setDescription(description)
+					setStatus(status)
+				}
+			} catch (error) {
+				if (!unmounted) {
+					setErrorMessage(error.response.data.message)
+				}
+			}
+		}
+		fetchTask()
+		return () => {
+			unmounted = true
+			setTitle(null)
+			setDescription(null)
+			setStatus(null)
+			setErrorMessage(null)
+			setUpdated(null)
+		}
+	}, [taskId])
 
 	const handleUpdate = async () => {
 		try {
-			await axios.patch(
-				`http://localhost:3000/tasks/${taskId}`,
-				{ title, description, status },
-				{ headers: { Authorization: `Bearer ${token}` } }
-			)
-		} catch (error) {
-			setErrorMessage(error)
-		}
+			await taskService.updateTask(taskId, {
+				title,
+				description,
+				status: status ? status : 'OPEN',
+			})
+			setUpdated(true)
+		} catch (error) {}
 	}
+
 	return (
 		<div>
+			{updated && (
+				<h1 style={{ background: 'green', color: 'white' }}>
+					Task Updated
+				</h1>
+			)}
+
 			{errorMessage && <ErrorMessage message={errorMessage} />}
 
 			<form
@@ -56,7 +71,6 @@ export default function UpdateTaskPage() {
 					fontSize: '1.8em',
 				}}
 			>
-				{errorMessage && <ErrorMessage message={errorMessage} />}
 				<h1>{title}</h1>
 
 				<p>{description}</p>

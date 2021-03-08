@@ -1,43 +1,48 @@
-import { BrowserRouter, Route, Switch, Redirect } from 'react-router-dom'
-import CreateTaskPage from './features/tasks/CreateTaskPage'
-import { AuthContext } from './features/shared/context/AuthContext'
-import TasksPage from './features/tasks/TasksPage'
-import Login from './features/user/Login'
-import Signup from './features/user/Signup'
+import { useCallback, useEffect, useState } from 'react'
+import { BrowserRouter } from 'react-router-dom'
+import Routes from './Routes'
+import localStorageHelper from './utils/localStorageHelper'
+// import authService from './services/auth'
 import './App.css'
-import useAuth from './features/shared/hooks/useAuth'
-import UpdateTaskPage from './features/tasks/UpdateTaskPage'
+
+let logoutTimer
 
 function App() {
-	const { token, login, logout, userId } = useAuth()
+	const [token, setToken] = useState()
+	const [tokenExpirationDate, setTokenExpirationDate] = useState(null)
 
-	let routes
+	const logout = useCallback(() => {
+		setToken(null)
+		setTokenExpirationDate(null)
+		localStorageHelper.logoutUser()
+	}, [])
 
-	if (!token) {
-		routes = (
-			<Switch>
-				<Route exact path="/" component={Login} />
-				<Route path="/signup" component={Signup} />
-				<Redirect to="/" />
-			</Switch>
-		)
-	} else {
-		routes = (
-			<Switch>
-				<Route path="/create-task" component={CreateTaskPage} />
-				<Route path="/tasks" exact component={TasksPage} />
-				<Route path="/tasks/:taskId" component={UpdateTaskPage} />
-				<Redirect to="/tasks" />
-			</Switch>
-		)
-	}
+	useEffect(() => {
+		if (token && tokenExpirationDate) {
+			const remainingTime =
+				tokenExpirationDate.getTime() - new Date().getTime()
+			logoutTimer = setTimeout(logout, remainingTime)
+		} else {
+			clearTimeout(logoutTimer)
+		}
+	}, [logout, token, tokenExpirationDate])
+
+	useEffect(() => {
+		const storedData = localStorageHelper.loadUser()
+
+		if (
+			storedData &&
+			storedData.accessToken &&
+			new Date(storedData.expiration) > new Date()
+		) {
+			setToken(storedData.accessToken)
+		}
+	}, [])
 
 	return (
-		<AuthContext.Provider
-			value={{ isLoggedIn: !!token, login, logout, userId, token }}
-		>
-			<BrowserRouter>{routes}</BrowserRouter>
-		</AuthContext.Provider>
+		<BrowserRouter>
+			<Routes token={token} setToken={setToken} />
+		</BrowserRouter>
 	)
 }
 
